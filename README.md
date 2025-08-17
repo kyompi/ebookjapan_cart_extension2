@@ -63,3 +63,4 @@ ebookjapan のカートページ (`/cart/`) にラベルごとのフィルター
 - メイン処理: `content.js`
 - スタイルは content.js 内にインライン定義済み
 
+# ebookjapan_cart_extension2
