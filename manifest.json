@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "ebookjapan カートフィルタ",
-  "version": "1.2.7",
-  "description": "ebookjapanカート用ラベルフィルタ（空のカートでもパネルを表示）",
+  "version": "1.2.8",
+  "description": "ebookjapanカート用ラベルフィルタ",
   "content_scripts": [
     {
       "matches": ["https://ebookjapan.yahoo.co.jp/*"],

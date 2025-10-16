@@ -116,6 +116,14 @@
 #${PANEL_ID} .${BTN_CLASS} small { opacity: .9 !important; font-size: 11px !important; }
 #${PANEL_ID} .ejcf-ops { border-top: 1px solid rgba(255,255,255,0.08) !important; padding-top: 8px !important; }
 .${HIDDEN_CLASS} { display: none !important; }
+#${PANEL_ID} .ejcf-total {
+  font-size: 10px !important;
+  opacity: .8 !important;
+  color: #e5e7eb !important;
+  text-align: center !important;
+  margin-top: 4px !important;
+}
+
 `;
 
   function injectInlineCSS() {
@@ -183,6 +191,14 @@
     header.appendChild(badge);
     panel.appendChild(header);
 
+    // subtle total line (cart + later)
+    const total = document.createElement("div");
+    total.id = PANEL_ID + "-total";
+    total.className = "ejcf-total";
+    total.textContent = "合計 0 件";
+    panel.appendChild(total);
+
+
     const btns = document.createElement("div");
     btns.className = "ejcf-buttons";
     panel.appendChild(btns);
@@ -193,6 +209,7 @@
       setBusy(true);
       await expandAll();
       refreshButtons();
+      updateTotalLine();
       reapplyIfNeeded();
       setBusy(false);
     }));
@@ -266,6 +283,7 @@
       btn.classList.add(SELECTED_CLASS);
       btn.setAttribute("aria-pressed", "true");
       refreshButtons();
+      updateTotalLine();
       reapplyIfNeeded();
       setBusy(false);
     });
@@ -322,6 +340,14 @@
       el.classList.toggle(HIDDEN_CLASS, !has);
     });
   }
+  function updateTotalLine() {
+    try {
+      const el = document.getElementById(PANEL_ID + "-total");
+      if (!el) return;
+      const total = getAllItemEls().length;
+      el.textContent = `合計 ${total} 件`;
+    } catch {}
+  }
 
   function reapplyIfNeeded() {
     const active = getActive();
@@ -358,6 +384,7 @@
       setBusy(true);
       await expandAll();
       refreshButtons();
+      updateTotalLine();
       reapplyIfNeeded();
       setBusy(false);
     }, 250);
@@ -386,6 +413,7 @@
     setBusy(true);
     await expandAll();
     refreshButtons();
+      updateTotalLine();
     reapplyIfNeeded();
     setupObserver();
     setBusy(false);
