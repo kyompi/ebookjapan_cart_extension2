@@ -1,18 +1,14 @@
+// === ebookjapan cart filter v1.2.7 ===
 (() => {
-  // ===== Settings =====
   const PANEL_ID = "ej-cart-filter-panel";
   const BTN_CLASS = "ejcf-btn";
   const SELECTED_CLASS = "ejcf-selected";
   const HIDDEN_CLASS = "ejcf-hidden";
   const COUNT_ATTR = "data-ejcf-count";
-  const VERSION = "v1.2.6";
+  const VERSION = "v1.2.7";
 
-  // ---- cart DOM selectors (厳しめ) ----
   const SEL = {
-    cartRootCandidates: [
-      "#cartContents",
-      ".cart-contents"
-    ],
+    cartRoots: [".page-cart", "#cartContents", ".cart-contents"],
     cartListItems: [
       "#cartContents .cart-list > li.cart-item",
       "#cartContents .cart-contents__list.cart-list > li.cart-item",
@@ -27,13 +23,12 @@
     moreToggles: [".contents-more-toggle .contents-more-toggle__text", ".contents-more-toggle__text"]
   };
 
-  // ===== State =====
   let booted = false;
   let isBusy = false;
   let observers = [];
   let hrefSnapshot = location.href;
 
-  // ===== CSS (inline) =====
+  // --- CSS ---
   const INLINE_CSS = `
 #${PANEL_ID} {
   position: fixed !important;
@@ -132,14 +127,13 @@
     document.documentElement.appendChild(style);
   }
 
-  // ===== Helpers =====
   const getActive = () => window.__ejcfActiveLabel || null;
   const setActive = (label) => { window.__ejcfActiveLabel = label || null; };
   const waitFor = (ms) => new Promise(r => setTimeout(r, ms));
   const debounce = (fn, ms) => { let id; return (...args) => { clearTimeout(id); id = setTimeout(() => fn(...args), ms); }; };
   const escapeHtml = (s) => s.replace(/[&<>"]/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 
-  // Draggable
+  // --- Draggable ---
   function dragEnable(panel, handle) {
     let dragging = false; let startY = 0; let startTop = 0;
     handle.style.cursor = "grab";
@@ -153,22 +147,13 @@
     window.addEventListener("mouseup", () => { dragging = false; handle.style.cursor = "grab"; });
   }
 
-  // ===== DOM & PATH Guards =====
-  const isOnCartPath = () => {
-    // /cart or /cart/ のみ（クエリはあってもOK）
-    return /^\/cart\/?$/.test(location.pathname);
-  };
-
-  const q = (selectors) => document.querySelector(selectors.join(", "));
-  const qAll = (selectors) => Array.from(document.querySelectorAll(selectors.join(", ")));
-
-  function hasCartDomStrict() {
-    const root = q(SEL.cartRootCandidates);
-    if (!root) return false;
-    const cartItems = qAll(SEL.cartListItems);
-    const laterItems = qAll(SEL.laterListItems);
-    // アイテムのどちらかが1件以上存在する場合のみ "カート画面" と判断
-    return (cartItems.length > 0 || laterItems.length > 0);
+  // --- Guards（空カート対応: root があればOK） ---
+  const isOnCartPath = () => /^\/cart\/?$/.test(location.pathname);
+  const q = (sels) => document.querySelector(sels.join(", "));
+  const qAll = (sels) => Array.from(document.querySelectorAll(sels.join(", ")));
+  function hasCartDomLoose() {
+    const root = q(SEL.cartRoots);
+    return !!root;
   }
 
   // ===== UI =====
@@ -242,8 +227,8 @@
 
   const extractLabels = (itemEl) => {
     const labels = new Set();
-    const tagWrap = itemEl.querySelector(".book-caption__tagtext-wrap") || itemEl;
-    itemEl.querySelectorAll(".book-caption__tagtext-wrap .tagtext, .tagtext").forEach(span => {
+    const tagWrap = itemEl.querySelector(SEL.tagWrap.join(", ")) || itemEl;
+    tagWrap.querySelectorAll(SEL.tag.join(", ")).forEach(span => {
       const t = (span.textContent || "").trim().replace(/\s+/g, "");
       if (t) labels.add(t);
     });
@@ -297,9 +282,19 @@
     const wrap = panel.querySelector(".ejcf-buttons");
     wrap.innerHTML = "";
     const map = computeLabelMap();
-    const sorted = Array.from(map.entries())
+    const entries = Array.from(map.entries())
       .sort(([a], [b]) => labelSortKey(a).localeCompare(labelSortKey(b), "ja"));
-    for (const [label, info] of sorted) {
+
+    if (entries.length === 0) {
+      const empty = document.createElement("button");
+      empty.className = BTN_CLASS;
+      empty.setAttribute("disabled", "true");
+      empty.innerHTML = `商品なし<br><small>0</small>`;
+      wrap.appendChild(empty);
+      return;
+    }
+
+    for (const [label, info] of entries) {
       wrap.appendChild(makeLabelBtn(label, info.count));
     }
   }
@@ -347,7 +342,7 @@
   }
 
   async function expandAll() {
-    const toggles = Array.from(document.querySelectorAll(".contents-more-toggle .contents-more-toggle__text, .contents-more-toggle__text"));
+    const toggles = Array.from(document.querySelectorAll(SEL.moreToggles.join(", ")));
     let clicked = 0;
     toggles.forEach(node => {
       const txt = (node.textContent || "").trim();
@@ -357,22 +352,18 @@
   }
 
   function setupObserver() {
-    const roots = [document.body];
     const conf = { childList: true, subtree: true };
     const debounced = debounce(async () => {
-      if (!hasCartDomStrict()) return; // カートでなければ何もしない
+      if (!hasCartDomLoose()) return;
       setBusy(true);
       await expandAll();
       refreshButtons();
       reapplyIfNeeded();
       setBusy(false);
     }, 250);
-
-    roots.forEach(root => {
-      const mo = new MutationObserver(debounced);
-      mo.observe(root, conf);
-      observers.push(mo);
-    });
+    const mo = new MutationObserver(debounced);
+    mo.observe(document.body, conf);
+    observers.push(mo);
   }
 
   function disconnectObservers() {
@@ -380,18 +371,16 @@
     observers = [];
   }
 
-  // ===== Boot / Teardown =====
   async function boot() {
     if (booted) return;
     injectInlineCSS();
     document.documentElement.dataset.ejcfVersion = VERSION;
 
-    // 厳密条件：/cart ルート かつ DOMが厳密に存在
     const start = performance.now();
-    while (!(isOnCartPath() && hasCartDomStrict()) && performance.now() - start < 15000) {
+    while (!(isOnCartPath() && hasCartDomLoose()) && performance.now() - start < 15000) {
       await waitFor(150);
     }
-    if (!(isOnCartPath() && hasCartDomStrict())) return;
+    if (!(isOnCartPath() && hasCartDomLoose())) return;
 
     booted = true;
     setBusy(true);
@@ -409,7 +398,7 @@
     booted = false;
   }
 
-  // ===== URL / DOM Change Detection =====
+  // --- URL / DOM Change Detection ---
   function installUrlGuards() {
     if (window.__ejcfUrlGuardInstalled) return;
     window.__ejcfUrlGuardInstalled = true;
@@ -431,23 +420,18 @@
     }, 400);
 
     // global mutation
-    const mo = new MutationObserver(() => {
-      fire();
-    });
+    const mo = new MutationObserver(() => fire());
     mo.observe(document.documentElement, {subtree: true, childList: true});
   }
 
   function handleRoute() {
     setTimeout(() => {
-      if (isOnCartPath() && hasCartDomStrict()) {
-        boot();
-      } else {
-        teardown();
-      }
-    }, 120); // 少し待ってから判定
+      if (isOnCartPath() && hasCartDomLoose()) boot();
+      else teardown();
+    }, 120);
   }
 
-  // ===== Init =====
+  // init
   installUrlGuards();
   window.addEventListener("ejcf-location-change", handleRoute);
   handleRoute();

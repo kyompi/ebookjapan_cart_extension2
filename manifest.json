@@ -1,16 +1,12 @@
 {
   "manifest_version": 3,
   "name": "ebookjapan カートフィルタ",
-  "version": "1.2.6",
-  "description": "ebookjapanカート用ラベルフィルタ（/cart ルート + 厳密DOM の二重ガード）",
+  "version": "1.2.7",
+  "description": "ebookjapanカート用ラベルフィルタ（空のカートでもパネルを表示）",
   "content_scripts": [
     {
-      "matches": [
-        "https://ebookjapan.yahoo.co.jp/*"
-      ],
-      "js": [
-        "content.js"
-      ],
+      "matches": ["https://ebookjapan.yahoo.co.jp/*"],
+      "js": ["content.js"],
       "run_at": "document_idle"
     }
   ]
